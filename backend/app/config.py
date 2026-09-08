@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Cloud File Storage"
     API_VERSION: str = "v1"
 
+    # Database
+    DATABASE_URL: str
+
     class Config:
         env_file = ".env"
         case_sensitive = True
