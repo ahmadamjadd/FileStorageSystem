@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 from app.models import User  # noqa: F401 — import so SQLAlchemy registers the model
-from app.routers import auth_router
+from app.routers import auth_router, files_router
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -25,6 +26,8 @@ app.add_middleware(
 
 # Register routers
 app.include_router(auth_router)
+app.include_router(files_router)
+
 
 
 @app.on_event("startup")
