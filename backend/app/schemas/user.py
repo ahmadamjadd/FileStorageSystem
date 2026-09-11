@@ -19,6 +19,30 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
 
 
+class UserLogin(BaseModel):
+    """
+    Schema for login requests.
+    
+    Accepts email and password, validates format.
+    """
+
+    email: EmailStr
+    password: str
+
+
+class Token(BaseModel):
+    """
+    Schema for the JWT token response.
+    
+    access_token: The JWT string the client will use for authentication
+    token_type: Always "bearer" — tells the client how to use the token
+                (send it in the Authorization header as "Bearer <token>")
+    """
+
+    access_token: str
+    token_type: str = "bearer"
+
+
 class UserResponse(BaseModel):
     """
     Schema for user data returned in API responses.

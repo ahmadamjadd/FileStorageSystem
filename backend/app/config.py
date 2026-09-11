@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
 
+    # JWT Authentication
+    JWT_SECRET_KEY: str          # Used to sign tokens — MUST be kept secret
+    JWT_ALGORITHM: str = "HS256" # HMAC-SHA256: symmetric signing algorithm
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # Token expires after 30 minutes
+
     class Config:
         env_file = ".env"
         case_sensitive = True
