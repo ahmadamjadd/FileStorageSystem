@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { LogOut, UploadCloud, File as FileIcon, Trash2, Download, Loader2, FileText, Image as ImageIcon, FileArchive, CheckCircle2, AlertCircle } from 'lucide-react';
-import { filesApi, FileData } from '../api/files';
-import { authApi, User } from '../api/auth';
+import { LogOut, UploadCloud, File as FileIcon, Trash2, Download, Loader2, FileText, Image as ImageIcon, FileArchive, CheckCircle2, AlertCircle, Cloud } from 'lucide-react';
+import { filesApi } from '../api/files';
+import type { FileData } from '../api/files';
+import { authApi } from '../api/auth';
+import type { User } from '../api/auth';
 import axios from 'axios';
 
 // Utility to format bytes into readable sizes (KB, MB)

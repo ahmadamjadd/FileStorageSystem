@@ -3,7 +3,7 @@ import apiClient from './client';
 export interface FileData {
   id: string;
   original_filename: string;
-  file_size: int;
+  file_size: number;
   content_type: string;
   uploaded_at: string;
 }
