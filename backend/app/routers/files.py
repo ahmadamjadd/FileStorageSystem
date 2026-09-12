@@ -5,8 +5,9 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.file import File
 from app.models.user import User
-from app.schemas.file import FileUploadResponse
-from app.services.s3 import generate_s3_key, upload_file_to_s3
+from app.schemas.file import FileResponse, FileUploadResponse, FileDownloadResponse
+from app.services.s3 import generate_s3_key, upload_file_to_s3, generate_presigned_url
+
 
 router = APIRouter(prefix="/api/files", tags=["Files"])
 
@@ -111,3 +112,86 @@ async def upload_file(
         message="File uploaded successfully.",
         file=file_record,
     )
+
+# Add this endpoint below the existing upload_file endpoint
+
+@router.get("/", response_model=list[FileResponse])
+def list_files(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """
+    List all files for the authenticated user.
+    
+    Flow:
+    1. Authenticate user (handled by get_current_user)
+    2. Query the files table for records matching the user's ID
+    3. Return the list of file metadata (no S3 keys exposed)
+    
+    Security: The WHERE clause (filter) ensures users can NEVER
+    see another user's files. This is the core of tenant isolation.
+    
+    Pagination: We use skip and limit to prevent loading thousands
+    of records at once if a user has many files.
+    """
+
+    # Query only the files belonging to the current user
+    files = (
+        db.query(File)
+        .filter(File.user_id == current_user.id)
+        .order_by(File.uploaded_at.desc()) # Newest first
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return files
+
+
+@router.get("/{file_id}/download", response_model=FileDownloadResponse)
+def download_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a pre-signed S3 URL to download a file.
+    
+    Flow:
+    1. Authenticate user
+    2. Look up the file in PostgreSQL by ID
+    3. Verify the file belongs to the current user (Authorization)
+    4. Generate a 1-hour pre-signed URL using the S3 key
+    5. Return the URL to the client
+    """
+
+    # Find the file in the database
+    file_record = db.query(File).filter(File.id == file_id).first()
+
+    # 1. Does the file exist?
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found.",
+        )
+
+    # 2. Does the file belong to the user requesting it?
+    # This is a critical security check to prevent Insecure Direct Object Reference (IDOR)
+    if file_record.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this file.",
+        )
+
+    # Generate the pre-signed URL
+    download_url = generate_presigned_url(s3_key=file_record.s3_key)
+
+    if not download_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate download link. Please try again.",
+        )
+
+    return FileDownloadResponse(download_url=download_url)

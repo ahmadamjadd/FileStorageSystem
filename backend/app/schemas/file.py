@@ -31,3 +31,11 @@ class FileUploadResponse(BaseModel):
 
     message: str
     file: FileResponse
+
+# Add this to the bottom of backend/app/schemas/file.py
+
+class FileDownloadResponse(BaseModel):
+    """
+    Response containing the pre-signed S3 URL for downloading a file.
+    """
+    download_url: str
