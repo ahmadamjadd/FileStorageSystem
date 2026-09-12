@@ -6,7 +6,7 @@ from app.dependencies import get_current_user
 from app.models.file import File
 from app.models.user import User
 from app.schemas.file import FileResponse, FileUploadResponse, FileDownloadResponse
-from app.services.s3 import generate_s3_key, upload_file_to_s3, generate_presigned_url
+from app.services.s3 import generate_s3_key, upload_file_to_s3, generate_presigned_url, delete_file_from_s3
 
 
 router = APIRouter(prefix="/api/files", tags=["Files"])
@@ -195,3 +195,57 @@ def download_file(
         )
 
     return FileDownloadResponse(download_url=download_url)
+
+
+@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a file from both S3 and the database.
+    
+    Flow:
+    1. Authenticate user
+    2. Look up the file in PostgreSQL
+    3. Verify the file belongs to the current user
+    4. Delete from S3 (the actual file bytes)
+    5. Delete from PostgreSQL (the metadata record)
+    
+    We return a 204 No Content status, which is standard for DELETE operations.
+    """
+
+    # 1 & 2. Find the file
+    file_record = db.query(File).filter(File.id == file_id).first()
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found.",
+        )
+
+    # 3. Security check (IDOR prevention)
+    if file_record.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this file.",
+        )
+
+    # 4. Delete from S3 FIRST
+    # If this fails, we don't want to delete the DB record.
+    # Otherwise, we'd have a leaked file in S3 with no DB record pointing to it.
+    s3_delete_success = delete_file_from_s3(s3_key=file_record.s3_key)
+    
+    if not s3_delete_success:
+         raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete file from storage. Please try again.",
+        )
+
+    # 5. Delete from PostgreSQL LAST
+    db.delete(file_record)
+    db.commit()
+
+    # We don't return anything (HTTP 204 No Content)
+    return None
+
