@@ -23,9 +23,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256" # HMAC-SHA256: symmetric signing algorithm
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # Token expires after 30 minutes
 
+    # Allow dynamic CORS domain
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # AWS S3
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
     AWS_REGION: str = "us-east-1"
     S3_BUCKET_NAME: str
 

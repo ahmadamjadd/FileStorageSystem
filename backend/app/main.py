@@ -18,7 +18,12 @@ app = FastAPI(
 # Without this, browsers block cross-origin requests (frontend on port 5173, backend on port 8000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],  # React dev servers
+    allow_origins=[
+        settings.FRONTEND_URL, 
+        "http://localhost:5173", 
+        "http://localhost:5174", 
+        "http://localhost:5175"
+    ],  # React dev servers
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
