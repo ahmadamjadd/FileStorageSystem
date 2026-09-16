@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: filestorage_user
+      POSTGRES_PASSWORD: filestorage_pass
+      POSTGRES_DB: filestorage_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U filestorage_user -d filestorage_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: 
+      context: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://filestorage_user:filestorage_pass@db:5432/filestorage_db
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

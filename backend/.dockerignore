@@ -1,0 +1,14 @@
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore compiled python files
+__pycache__/
+*.pyc
+
+# IMPORTANT: Never bake secrets into a Docker image!
+.env
+
+# Ignore git history
+.git/
+.gitignore
