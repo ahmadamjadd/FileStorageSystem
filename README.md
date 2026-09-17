@@ -11,7 +11,7 @@ A modern, full-stack web application for securely storing, managing, and sharing
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 - **Frontend:** React + TypeScript + Vite + Tailwind CSS v4
 - **Backend:** FastAPI (Python) + SQLAlchemy
@@ -19,10 +19,11 @@ A modern, full-stack web application for securely storing, managing, and sharing
 - **Blob Storage:** Amazon S3 (for the actual file bytes)
 - **Container Registry:** Amazon ECR
 - **Compute:** Amazon ECS (Elastic Container Service) with EC2 Launch Type
+- **Frontend Hosting:** Amazon S3 Static Website Hosting
 
 ---
 
-## 🚀 Getting Started (Local Development)
+## Getting Started (Local Development)
 
 ### 1. Prerequisites
 - Python 3.10+
@@ -58,7 +59,7 @@ npm run dev
 
 ---
 
-## ☁️ AWS Deployment Guide
+## AWS Deployment Guide
 
 1. **Database:** Provision an Amazon RDS PostgreSQL instance in a public/private subnet and allow inbound traffic from your compute environment.
 2. **Container Registry (ECR):**
@@ -74,13 +75,18 @@ npm run dev
    - Create a Task Definition (bridge network mode) pulling the image from ECR. Map container port 8000 to host port 8000.
    - Supply the environment variables (`DATABASE_URL`, `JWT_SECRET_KEY`, `S3_BUCKET_NAME`).
    - Run the task as an ECS Service.
-4. **Security Groups:**
+4. **Security Groups & IAM:**
    - Ensure the EC2 instance Security Group allows inbound TCP 8000 from the internet.
    - Ensure the RDS Security Group allows inbound TCP 5432 from the EC2 Instance's Security Group.
+   - Attach `AmazonS3FullAccess` to the EC2 Instance IAM Role.
+5. **Frontend Hosting (S3):**
+   - Build the React app (`npm run build`) pointing to the EC2 IP.
+   - Upload the `dist/` folder to an S3 Bucket.
+   - Enable Static Website Hosting and attach a Public Read Bucket Policy.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 FileStorageSystem/
