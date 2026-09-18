@@ -10,6 +10,11 @@ jobs:
   test:
     name: Run Pytest
     runs-on: ubuntu-latest
+    
+    env:
+      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      JWT_SECRET_KEY: "super_secret_dummy_key_for_ci"
+      S3_BUCKET_NAME: "dummy-ci-bucket"
 
     steps:
     - name: Checkout repository
