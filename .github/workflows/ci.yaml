@@ -79,8 +79,7 @@ jobs:
         # Push both tags to AWS ECR
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-      
-        # NEW: Download the current ECS server blueprint
+  
     - name: Download task definition
       run: |
         aws ecs describe-task-definition --task-definition filestorage-backend-task --query taskDefinition > task-definition.json
@@ -101,5 +100,5 @@ jobs:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         service: filestorage-backend-service
         cluster: filestorage-cluster
-        wait-for-service-stability: true
+        wait-for-service-stability: false
 
