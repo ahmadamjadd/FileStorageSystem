@@ -1,0 +1,125 @@
+name: Backend CI/CD
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yaml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yaml'
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    name: Run Pytest
+    runs-on: ubuntu-latest
+    
+    env:
+      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      JWT_SECRET_KEY: "super_secret_dummy_key_for_ci"
+      S3_BUCKET_NAME: "dummy-ci-bucket"
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run tests
+      run: |
+        cd backend
+        pytest
+
+  build:
+    name: Build Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Print OIDC Subject
+      run: |
+        TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+        echo "$TOKEN" | python3 -c "import sys,base64,json; p=sys.stdin.read().split('.')[1]; print(json.loads(base64.urlsafe_b64decode(p+'='*(-len(p)%4)))['sub'])"
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+        aws-region: ap-south-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push Docker image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: filestorage-backend
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Build the image with the specific commit hash
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
+        
+        # Build it again and tag it as latest (for easy reference)
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./backend
+        
+        # Push both tags to AWS ECR
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+  
+    - name: Download task definition
+      run: |
+        aws ecs describe-task-definition --task-definition filestorage-backend-task --query taskDefinition > task-definition.json
+
+    # NEW: Inject the new Docker Image URL into the blueprint
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: filestorage
+        image: ${{ steps.login-ecr.outputs.registry }}/filestorage-backend:${{ github.sha }}
+
+    # NEW: Deploy the updated blueprint and wait for it to start
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: filestorage-backend-service
+        cluster: filestorage-cluster
+        wait-for-service-stability: true
+        # NEW: Actively verify the deployment actually works!
+    - name: Verify Production Health (Smoke Test)
+      run: |
+        echo "Waiting 15 seconds for the application to fully boot and route traffic..."
+        sleep 15
+        
+        echo "Sending request to production health endpoint..."
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://13.201.76.243:8000/api/health)
+        
+        if [ "$HTTP_STATUS" -eq 200 ]; then
+          echo "✅ Deployment Verification Passed! API is healthy."
+          exit 0
+        else
+          echo "❌ Deployment Verification Failed! API returned HTTP $HTTP_STATUS."
+          exit 1
+        fi
+
+
