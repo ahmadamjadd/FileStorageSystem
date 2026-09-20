@@ -37,10 +37,10 @@ jobs:
         cd frontend
         npm ci
 
+
     - name: Build frontend
       env:
-        # Pass the production backend URL to React during build
-        VITE_API_URL: http://13.201.76.243:8000
+        VITE_API_URL: ${{ vars.PRODUCTION_API_URL }}
       run: |
         cd frontend
         npm run build
@@ -48,11 +48,10 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        role-to-assume: arn:aws:iam::053108159236:role/github-actions-deploy-role
+        role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
         aws-region: ap-south-1
 
     - name: Deploy to S3
       run: |
-        # Sync the dist folder to S3. 
-        # --delete removes any old files in S3 that don't exist in the new build.
-        aws s3 sync ./frontend/dist s3://cloud-filestorage-9080  --delete
+        aws s3 sync ./frontend/dist s3://${{ vars.FRONTEND_BUCKET_NAME }} --delete
+
