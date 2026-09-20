@@ -79,3 +79,27 @@ jobs:
         # Push both tags to AWS ECR
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      
+        # NEW: Download the current ECS server blueprint
+    - name: Download task definition
+      run: |
+        aws ecs describe-task-definition --task-definition filestorage-backend-task --query taskDefinition > task-definition.json
+
+    # NEW: Inject the new Docker Image URL into the blueprint
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: filestorage
+        image: ${{ steps.login-ecr.outputs.registry }}/filestorage-backend:${{ github.sha }}
+
+    # NEW: Deploy the updated blueprint and wait for it to start
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: filestorage-backend-service
+        cluster: filestorage-cluster
+        wait-for-service-stability: true
+
