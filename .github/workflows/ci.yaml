@@ -101,4 +101,21 @@ jobs:
         service: filestorage-backend-service
         cluster: filestorage-cluster
         wait-for-service-stability: false
+        # NEW: Actively verify the deployment actually works!
+    - name: Verify Production Health (Smoke Test)
+      run: |
+        echo "Waiting 15 seconds for the application to fully boot and route traffic..."
+        sleep 15
+        
+        echo "Sending request to production health endpoint..."
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://13.201.76.243:8000/api/health)
+        
+        if [ "$HTTP_STATUS" -eq 200 ]; then
+          echo "✅ Deployment Verification Passed! API is healthy."
+          exit 0
+        else
+          echo "❌ Deployment Verification Failed! API returned HTTP $HTTP_STATUS."
+          exit 1
+        fi
+
 
