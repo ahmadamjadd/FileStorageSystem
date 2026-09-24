@@ -104,7 +104,8 @@ resource "aws_ecs_task_definition" "backend" {
     environment = [
       { name = "DATABASE_URL", value = "postgresql://${aws_db_instance.database.username}:${random_password.db_password.result}@${aws_db_instance.database.endpoint}/${aws_db_instance.database.db_name}" },
       { name = "S3_BUCKET_NAME", value = "cloud-filestorage-9080" },
-      { name = "JWT_SECRET_KEY", value = "temp_secret_we_will_fix_in_step_18" } 
+      { name = "JWT_SECRET_KEY", value = "temp_secret_we_will_fix_in_step_18" },
+      { name = "FRONTEND_URL", value = "http://filestorage-frontend-9080.s3-website.ap-south-1.amazonaws.com" }
     ]
   }])
 }
