@@ -113,7 +113,7 @@ jobs:
         sleep 15
         
         echo "Fetching public IP of EC2 instance..."
-        EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=filestorage-ecs-node" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+        EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=filestorage-ecs-node" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
         echo "EC2 IP is $EC2_IP"
         
         echo "Sending request to production health endpoint..."
