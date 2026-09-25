@@ -86,7 +86,7 @@ jobs:
   
     - name: Download task definition
       run: |
-        aws ecs describe-task-definition --task-definition filestorage-backend-task --query taskDefinition > task-definition.json
+        aws ecs describe-task-definition --task-definition filestorage-backend-tf --query taskDefinition > task-definition.json
 
     # NEW: Inject the new Docker Image URL into the blueprint
     - name: Fill in the new image ID in the Amazon ECS task definition
@@ -102,17 +102,22 @@ jobs:
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: filestorage-backend-service
-        cluster: filestorage-cluster
+        service: filestorage-backend-service-tf
+        cluster: filestorage-cluster-tf
         wait-for-service-stability: true
-        # NEW: Actively verify the deployment actually works!
+        
+    # NEW: Actively verify the deployment actually works!
     - name: Verify Production Health (Smoke Test)
       run: |
         echo "Waiting 15 seconds for the application to fully boot and route traffic..."
         sleep 15
         
+        echo "Fetching public IP of EC2 instance..."
+        EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=filestorage-ecs-node" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+        echo "EC2 IP is $EC2_IP"
+        
         echo "Sending request to production health endpoint..."
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://13.201.76.243:8000/api/health)
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$EC2_IP:8000/api/health)
         
         if [ "$HTTP_STATUS" -eq 200 ]; then
           echo "✅ Deployment Verification Passed! API is healthy."
