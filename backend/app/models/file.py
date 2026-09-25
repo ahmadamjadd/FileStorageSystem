@@ -40,6 +40,10 @@ class File(Base):
     # e.g., "users/abc123/550e8400_vacation_photo.jpg"
     s3_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
 
+    folder_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("folders.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+
     # File size in bytes — useful for displaying "2.5 MB" in the UI
     # and for enforcing upload limits
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)

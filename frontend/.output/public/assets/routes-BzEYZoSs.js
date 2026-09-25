@@ -1,0 +1,1 @@
+import{n as e,t}from"./RequireAuth-DhWrBQpf.js";import{P as n}from"./index-7WBSJVSF.js";var r=n();function i(){return(0,r.jsx)(t,{children:(0,r.jsx)(e,{folderId:null})})}export{i as component};

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 from app.models import User  # noqa: F401 — import so SQLAlchemy registers the model
-from app.routers import auth_router, files_router
+from app.routers import auth_router, files_router, folders_router
 
 
 app = FastAPI(
@@ -22,7 +22,8 @@ app.add_middleware(
         settings.FRONTEND_URL, 
         "http://localhost:5173", 
         "http://localhost:5174", 
-        "http://localhost:5175"
+        "http://localhost:5175",
+        "https://stash.lovable.app"
     ],  # React dev servers
     allow_credentials=True,
     allow_methods=["*"],
@@ -32,6 +33,7 @@ app.add_middleware(
 # Register routers
 app.include_router(auth_router)
 app.include_router(files_router)
+app.include_router(folders_router)
 
 
 
@@ -39,14 +41,21 @@ app.include_router(files_router)
 def on_startup():
     """
     Create all database tables when the application starts.
-    
-    Base.metadata.create_all() checks which tables exist in PostgreSQL
-    and creates any that are missing. It will NOT modify or drop existing tables.
-    
-    Note: In production, you'd use a migration tool like Alembic instead.
-    For Phase 1, this approach is simpler and sufficient.
     """
     Base.metadata.create_all(bind=engine)
+    
+    # Safe schema migration for Phase 3 (Folders)
+    # create_all does not add missing columns to existing tables, so we do it manually here.
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            # Check if folder_id exists
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='files' AND column_name='folder_id'"))
+            if not result.fetchone():
+                conn.execute(text("ALTER TABLE files ADD COLUMN folder_id VARCHAR(36) REFERENCES folders(id) ON DELETE CASCADE"))
+                conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
 
 
 @app.get("/api/health")

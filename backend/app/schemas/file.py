@@ -1,41 +1,29 @@
 from datetime import datetime
+from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class FileRename(BaseModel):
+    name: str
 
 
 class FileResponse(BaseModel):
-    """
-    Schema for file metadata returned in API responses.
-    
-    Note: This does NOT include the s3_key. We don't expose
-    internal storage details to the client. When they need to
-    download, they'll use the file ID and we'll generate a
-    pre-signed URL server-side.
-    """
-
     id: str
-    original_filename: str
-    file_size: int
-    content_type: str
-    uploaded_at: datetime
+    name: str = Field(alias="original_filename")
+    folder_id: Optional[str] = None
+    size_bytes: int = Field(alias="file_size")
+    mime_type: str = Field(alias="content_type")
+    created_at: datetime = Field(alias="uploaded_at")
+    updated_at: datetime = Field(alias="uploaded_at")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class FileUploadResponse(BaseModel):
-    """
-    Response after a successful file upload.
-    Includes the file metadata plus a success message.
-    """
-
     message: str
     file: FileResponse
 
-# Add this to the bottom of backend/app/schemas/file.py
 
 class FileDownloadResponse(BaseModel):
-    """
-    Response containing the pre-signed S3 URL for downloading a file.
-    """
     download_url: str

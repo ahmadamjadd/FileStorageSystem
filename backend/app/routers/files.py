@@ -33,26 +33,18 @@ ALLOWED_CONTENT_TYPES = {
 }
 
 
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status, Form
+
 @router.post("/upload", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile,
+    folder_id: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Upload a file for the authenticated user.
-    
-    Flow:
-    1. Validate the file (size, content type)
-    2. Read the file content
-    3. Generate a unique S3 key
-    4. Upload the file to S3
-    5. Save file metadata to PostgreSQL
-    6. Return the file metadata
-    
-    The function is 'async' because reading the uploaded file is an I/O
-    operation that benefits from async handling. FastAPI can serve other
-    requests while waiting for the file to be read.
     """
 
     # Validate content type
@@ -102,6 +94,7 @@ async def upload_file(
         s3_key=s3_key,
         file_size=file_size,
         content_type=file.content_type,
+        folder_id=folder_id
     )
 
     db.add(file_record)
@@ -117,37 +110,43 @@ async def upload_file(
 
 @router.get("/", response_model=list[FileResponse])
 def list_files(
+    folder_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
 ):
     """
-    List all files for the authenticated user.
-    
-    Flow:
-    1. Authenticate user (handled by get_current_user)
-    2. Query the files table for records matching the user's ID
-    3. Return the list of file metadata (no S3 keys exposed)
-    
-    Security: The WHERE clause (filter) ensures users can NEVER
-    see another user's files. This is the core of tenant isolation.
-    
-    Pagination: We use skip and limit to prevent loading thousands
-    of records at once if a user has many files.
+    List all files for the authenticated user, optionally filtered by folder.
     """
 
-    # Query only the files belonging to the current user
-    files = (
-        db.query(File)
-        .filter(File.user_id == current_user.id)
-        .order_by(File.uploaded_at.desc()) # Newest first
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    query = db.query(File).filter(File.user_id == current_user.id)
+    if folder_id:
+        query = query.filter(File.folder_id == folder_id)
+    else:
+        query = query.filter(File.folder_id.is_(None))
+        
+    files = query.order_by(File.uploaded_at.desc()).offset(skip).limit(limit).all()
 
     return files
+
+from app.schemas.file import FileRename
+
+@router.put("/{file_id}", response_model=FileResponse)
+def rename_file(
+    file_id: str,
+    data: FileRename,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    file_record = db.query(File).filter(File.id == file_id, File.user_id == current_user.id).first()
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_record.original_filename = data.name
+    db.commit()
+    db.refresh(file_record)
+    return file_record
 
 
 @router.get("/{file_id}/download", response_model=FileDownloadResponse)

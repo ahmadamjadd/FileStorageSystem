@@ -1,0 +1,1 @@
+import{P as e}from"./index-7WBSJVSF.js";import{t}from"./AuthForm-OSSbI1Re.js";var n=e(),r=()=>(0,n.jsx)(t,{mode:`register`});export{r as component};
