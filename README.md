@@ -1,10 +1,11 @@
+
 # Cloud File Storage Platform
 
 A modern, full-stack cloud file storage platform (similar in concept to Google Drive or Dropbox) built from the ground up to explore system design, cloud architecture, and DevOps engineering.
 
 ## Project Purpose & Philosophy
 
-This project is not simply about building another CRUD application or learning how to write infrastructure scripts. It is a deliberate, deep dive into **System Design and Architecture**. 
+This project is not simply about building another CRUD application or learning how to write infrastructure scripts. It is a deliberate, deep dive into **System Design and Architecture**.
 
 While modern tools and LLMs make implementing software easier, getting the architecture and engineering decisions right requires a fundamental understanding of the system itself. This project serves as a practical application of studying engineering blogs, architecture discussions, and technical trade-offs.
 
@@ -23,6 +24,7 @@ The core focus is on the **reasoning** behind the system:
 This project was built deliberately across three major evolutionary phases. Instead of using frameworks to hide complexity, components were implemented from scratch to deeply understand the underlying engineering principles. The following sections detail the granular design choices made in each phase.
 
 ### Phase 1: Application Engineering, Data Modeling, & API Design
+
 The foundational phase focused exclusively on the software architecture, defining strict API contracts, and engineering a highly decoupled data model.
 
 **Deep Authentication & Stateless Security**
@@ -33,19 +35,20 @@ The foundational phase focused exclusively on the software architecture, definin
 **Hybrid Data Storage Architecture**
 - **Relational Metadata (PostgreSQL):** Designed a normalized relational schema to handle highly structured, ACID-compliant transactions. The database is strictly responsible for managing user profiles, tracking file metadata (names, sizes, MIME types, timestamps), and enforcing foreign-key ownership constraints.
 - **Object Storage (Amazon S3):** Selected blob storage to handle the actual binary file payloads. The database never stores raw files, preventing database bloat and performance degradation.
-- **Pre-signed URL Broker Pattern:** Instead of piping large binary file uploads through the backend server (which would consume massive compute memory and bandwidth), the backend acts as a secure broker. It authenticates the user, generates a temporary, cryptographically signed AWS S3 URL, and instructs the client to upload/download the file directly to/from the S3 bucket.
+- **Backend-Mediated Uploads & Pre-signed Downloads:** Implemented file uploads through the backend API, which receives the file and uploads its binary payload to Amazon S3 while managing the associated metadata. For downloads, the backend acts as a secure broker, authenticating the user and generating a temporary, cryptographically signed AWS S3 URL that allows the client to download the file directly from the S3 bucket.
 
 **Frontend State & Interaction**
 - **Single Page Application (SPA):** Engineered a responsive client interface to consume the RESTful APIs.
 - **Stateless Token Management:** Handled the secure storage and transmission of JWT Bearer tokens in HTTP headers for every authenticated request.
-- **Direct-to-Cloud Uploads:** Implemented the client-side logic to request pre-signed URLs from the API and execute `PUT` requests directly against the AWS S3 endpoint, resulting in lightning-fast, highly scalable file transfers.
+- **Cloud File Uploads & Downloads:** Implemented client-side logic to upload files through the backend API and request pre-signed URLs for direct downloads from Amazon S3.
 
 ### Phase 2: Cloud Deployment, Containerization, & Network Security
+
 With the software architecture complete, this phase transitioned the application from a local development environment into a production-grade, distributed cloud environment.
 
 **Immutable Infrastructure via Containerization**
-- **Dockerization:** Wrote highly optimized, custom Dockerfiles for the backend services. 
-- **Multi-stage Builds:** Utilized multi-stage container builds to compile dependencies in an isolated environment before copying them into a lean runtime image, drastically reducing the final container size and minimizing the security attack surface.
+- **Dockerization:** Wrote a custom Dockerfile for the backend service to package the application and its dependencies into a reproducible container image.
+- **Single-Stage Container Build:** Implemented a single-stage Docker build that installs the required dependencies and packages the backend application into a deployable runtime image.
 - **Environment Parity:** Abstracted all configuration (Database URLs, S3 Bucket names, Secret Keys) into environment variables injected at runtime, strictly adhering to Twelve-Factor App methodology.
 
 **Compute & Managed Services**
@@ -58,6 +61,7 @@ With the software architecture complete, this phase transitioned the application
 - **Security Group Firewalls:** Configured stateful firewall rules (Security Groups) to strictly control ingress/egress traffic. Specifically, the RDS database Security Group was configured to reject all internet traffic, only accepting connections originating from the internal ECS Security Group.
 
 ### Phase 3: DevOps Automation, GitOps, & Infrastructure as Code (IaC)
+
 The manual cloud configurations ("ClickOps") of Phase 2 were entirely eliminated. This phase introduced enterprise-grade DevOps practices, making the infrastructure perfectly reproducible, version-controlled, and fully automated.
 
 **Infrastructure as Code (Terraform)**
@@ -69,7 +73,7 @@ The manual cloud configurations ("ClickOps") of Phase 2 were entirely eliminated
 **Secure CI/CD Pipelines (GitHub Actions)**
 - **Application Pipeline (CI):** Built a workflow that automatically triggers on Pull Requests. It runs the automated test suite, builds the Docker image, tags it with the Git commit SHA for absolute traceability, pushes it to ECR, and triggers a rolling update in ECS.
 - **Infrastructure Pipeline (CD):** Built a GitOps workflow where infrastructure changes are proposed via Pull Requests. GitHub Actions automatically runs `terraform plan` and posts the dry-run output to the PR for human review. Upon merging to the main branch, `terraform apply` is executed to safely mutate the cloud environment.
-- **Remote State Locking:** Configured Terraform to store its state file remotely in a secure S3 bucket, utilizing a DynamoDB table for state-locking to prevent race conditions during concurrent CI/CD pipeline executions.
+- **Remote State Locking:** Configured Terraform to store its state file remotely in a secure S3 bucket, utilizing S3-native lockfiles to prevent race conditions during concurrent CI/CD pipeline executions.
 
 **OpenID Connect (OIDC) & Least Privilege Identity**
 - **Eradication of Static Secrets:** Removed all long-lived AWS Access Keys (IAM Users) from GitHub Secrets.
